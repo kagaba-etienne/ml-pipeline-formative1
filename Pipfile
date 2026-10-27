@@ -1,0 +1,24 @@
+[[source]]
+url = "https://pypi.org/simple"
+verify_ssl = true
+name = "pypi"
+
+[packages]
+pandas = "*"
+pymongo = "*"
+prisma = "*"
+psycopg2-binary = "*"
+scikit-learn = "*"
+python-dotenv = "*"
+fastapi = "*"
+matplotlib = "*"
+seaborn = "*"
+statsmodels = "*"
+
+[dev-packages]
+ipykernel = "*"
+nbclient = "*"
+nbconvert = "*"
+
+[requires]
+python_version = "3.14"
