@@ -87,6 +87,13 @@ CREATE TABLE hourly_bars (
 -- Records scheduled maintenance or exchange outages where no trades occurred.
 -- Each outage in this dataset spans 23 consecutive hours (414 empty hours total).
 -- Storing these separately preserves raw data integrity without synthetic fills.
+--
+-- Convention:
+--   - gap_start: DATETIME of the FIRST missing/empty hour (inclusive).
+--   - gap_end  : DATETIME of the LAST missing/empty hour (inclusive).
+--   - duration_hours: Total missing hours (gap_end - gap_start + 1 hour = 23).
+--   Using inclusive endpoints allows queries like:
+--     WHERE bar_time BETWEEN gap_start AND gap_end
 -- -----------------------------------------------------------------------------
 CREATE TABLE data_gaps (
     gap_id          INT AUTO_INCREMENT PRIMARY KEY,
