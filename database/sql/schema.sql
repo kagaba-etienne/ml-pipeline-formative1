@@ -1,0 +1,131 @@
+-- =============================================================================
+-- Formative 1: Time Series Data Pipeline - Task 2 (MySQL Database Schema)
+-- Database Name: crypto_pipeline
+--
+-- This schema defines tables for:
+--   1. symbols       : Supported cryptocurrency trading pairs (lookup table)
+--   2. hourly_bars   : Cleaned, hourly-aggregated OHLCV candlestick data
+--   3. data_gaps     : Known exchange outages / missing trade intervals
+--   4. predictions   : Model forecasting results (supports Task 4 predictions)
+-- =============================================================================
+
+CREATE DATABASE IF NOT EXISTS crypto_pipeline
+  CHARACTER SET utf8mb4
+  COLLATE utf8mb4_unicode_ci;
+
+USE crypto_pipeline;
+
+-- -----------------------------------------------------------------------------
+-- Drop tables in reverse order of foreign key dependencies to avoid errors
+-- -----------------------------------------------------------------------------
+DROP TABLE IF EXISTS predictions;
+DROP TABLE IF EXISTS data_gaps;
+DROP TABLE IF EXISTS hourly_bars;
+DROP TABLE IF EXISTS symbols;
+
+-- -----------------------------------------------------------------------------
+-- Table 1: symbols
+-- Dimension/lookup table storing metadata for each tracked cryptocurrency pair.
+-- -----------------------------------------------------------------------------
+CREATE TABLE symbols (
+    symbol_id       INT AUTO_INCREMENT PRIMARY KEY,
+    symbol_code     VARCHAR(10) NOT NULL,
+    base_asset      VARCHAR(10) NOT NULL,
+    quote_asset     VARCHAR(10) NOT NULL DEFAULT 'USD',
+    is_active       BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT uq_symbol_code UNIQUE (symbol_code)
+) ENGINE=InnoDB;
+
+-- Pre-populate the 3 active pairs from the Gemini dataset
+INSERT INTO symbols (symbol_code, base_asset, quote_asset) VALUES
+    ('BTCUSD', 'BTC', 'USD'),
+    ('ETHUSD', 'ETH', 'USD'),
+    ('LTCUSD', 'LTC', 'USD');
+
+-- -----------------------------------------------------------------------------
+-- Table 2: hourly_bars
+-- Main fact table storing 1-hour aggregated candlestick data.
+-- 
+-- Design considerations:
+--  - bar_id: Synthetic primary key (BIGINT) supporting REST API CRUD (Task 3).
+--  - bar_time: DATETIME representing the start of the hour in UTC.
+--  - DECIMAL(18, 4) for prices: Exact precision, preventing floating-point
+--    rounding errors on financial valuations.
+--  - DECIMAL(24, 8) for volume: Crypto volumes can have up to 8 decimal places.
+--  - minute_count: The number of raw 1-minute trades aggregated (1 to 60).
+-- -----------------------------------------------------------------------------
+CREATE TABLE hourly_bars (
+    bar_id          BIGINT AUTO_INCREMENT PRIMARY KEY,
+    symbol_id       INT NOT NULL,
+    bar_time        DATETIME NOT NULL,
+    open_price      DECIMAL(18, 4) NOT NULL,
+    high_price      DECIMAL(18, 4) NOT NULL,
+    low_price       DECIMAL(18, 4) NOT NULL,
+    close_price     DECIMAL(18, 4) NOT NULL,
+    volume          DECIMAL(24, 8) NOT NULL,
+    minute_count    TINYINT UNSIGNED NOT NULL,
+    created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+
+    -- Foreign key to ensure referential integrity with symbols
+    CONSTRAINT fk_hourly_bars_symbol
+        FOREIGN KEY (symbol_id) REFERENCES symbols (symbol_id)
+        ON DELETE RESTRICT ON UPDATE CASCADE,
+
+    -- Business key: Exactly one bar per symbol per hour; prevents duplicates
+    CONSTRAINT uq_symbol_bar_time
+        UNIQUE (symbol_id, bar_time),
+
+    -- Index for fast cross-symbol date/time range filtering
+    INDEX idx_bar_time (bar_time)
+) ENGINE=InnoDB;
+
+-- -----------------------------------------------------------------------------
+-- Table 3: data_gaps
+-- Records scheduled maintenance or exchange outages where no trades occurred.
+-- Each outage in this dataset spans 23 consecutive hours (414 empty hours total).
+-- Storing these separately preserves raw data integrity without synthetic fills.
+-- -----------------------------------------------------------------------------
+CREATE TABLE data_gaps (
+    gap_id          INT AUTO_INCREMENT PRIMARY KEY,
+    symbol_id       INT NOT NULL,
+    gap_start       DATETIME NOT NULL,
+    gap_end         DATETIME NOT NULL,
+    duration_hours  INT NOT NULL,
+    notes           VARCHAR(255) DEFAULT 'Exchange outage (23-hour gap)',
+    created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT fk_data_gaps_symbol
+        FOREIGN KEY (symbol_id) REFERENCES symbols (symbol_id)
+        ON DELETE RESTRICT ON UPDATE CASCADE,
+
+    CONSTRAINT uq_symbol_gap_start
+        UNIQUE (symbol_id, gap_start),
+
+    INDEX idx_gap_range (gap_start, gap_end)
+) ENGINE=InnoDB;
+
+-- -----------------------------------------------------------------------------
+-- Table 4: predictions (Optional / Future-proof for Tasks 3 & 4)
+-- Stores hourly model predictions generated by Task 4.
+-- -----------------------------------------------------------------------------
+CREATE TABLE predictions (
+    prediction_id   BIGINT AUTO_INCREMENT PRIMARY KEY,
+    symbol_id       INT NOT NULL,
+    target_time     DATETIME NOT NULL,
+    predicted_close DECIMAL(18, 4) NOT NULL,
+    actual_close    DECIMAL(18, 4) NULL,
+    model_version   VARCHAR(50) NOT NULL,
+    created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT fk_predictions_symbol
+        FOREIGN KEY (symbol_id) REFERENCES symbols (symbol_id)
+        ON DELETE RESTRICT ON UPDATE CASCADE,
+
+    CONSTRAINT uq_symbol_target_model
+        UNIQUE (symbol_id, target_time, model_version),
+
+    INDEX idx_predictions_target_time (target_time)
+) ENGINE=InnoDB;
