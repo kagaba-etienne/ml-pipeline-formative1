@@ -3,6 +3,11 @@ url = "https://pypi.org/simple"
 verify_ssl = true
 name = "pypi"
 
+[scripts]
+generate-mysql = "python -m prisma generate --schema database/sql/prisma/schema.prisma"
+generate-mongo = "python -m prisma generate --schema database/mongo/prisma/schema.prisma"
+start = "uvicorn src.main:app --reload --host 0.0.0.0 --port 8000"
+
 [packages]
 pandas = "*"
 pymongo = "*"
@@ -11,9 +16,11 @@ psycopg2-binary = "*"
 scikit-learn = "*"
 python-dotenv = "*"
 fastapi = "*"
+uvicorn = "*"
 matplotlib = "*"
 seaborn = "*"
 statsmodels = "*"
+pymysql = "*"
 
 [dev-packages]
 ipykernel = "*"

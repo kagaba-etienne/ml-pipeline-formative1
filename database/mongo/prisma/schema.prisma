@@ -1,0 +1,39 @@
+generator client {
+  provider             = "prisma-client-py"
+  output               = "../../../generated/mongo_client"
+  recursive_type_depth = "5"
+  interface            = "asyncio"
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("MONGODB_DATABASE_URL")
+}
+
+model hourly_bars {
+  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  symbol       String
+  timestamp    DateTime
+  open_price   Float
+  high_price   Float
+  low_price    Float
+  close_price  Float
+  volume       Float
+  minute_count Int
+  created_at   DateTime
+
+  @@unique([symbol, timestamp], map: "uq_symbol_timestamp")
+  @@index([timestamp], map: "idx_timestamp")
+}
+
+model data_gaps {
+  id             String   @id @default(auto()) @map("_id") @db.ObjectId
+  symbol         String
+  gap_start      DateTime
+  gap_end        DateTime
+  duration_hours Int
+  notes          String
+  created_at     DateTime
+
+  @@unique([symbol, gap_start], map: "uq_symbol_gap_start")
+}

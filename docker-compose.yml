@@ -1,0 +1,98 @@
+services:
+  mysql:
+    image: mysql:8
+    environment:
+      MYSQL_ROOT_PASSWORD: password
+      MYSQL_DATABASE: crypto_pipeline
+    ports:
+      - "3307:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-ppassword"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 20s
+
+  mongo:
+    image: mongo:7
+    command: ["mongod", "--replSet", "rs0", "--bind_ip_all"]
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    healthcheck:
+      test:
+        - CMD
+        - mongosh
+        - --quiet
+        - --eval
+        - |
+          try {
+            if (rs.status().myState === 1) {
+              quit(0);
+            }
+          } catch (e) {
+            rs.initiate({_id: "rs0", members: [{_id: 0, host: "mongo:27017"}]});
+          }
+          quit(1);
+      interval: 5s
+      timeout: 10s
+      retries: 30
+      start_period: 10s
+
+  seed:
+    build: .
+    depends_on:
+      mysql:
+        condition: service_healthy
+      mongo:
+        condition: service_healthy
+    volumes:
+      - .:/app
+    working_dir: /app
+    environment:
+      MYSQL_HOST: mysql
+      MYSQL_PORT: "3306"
+      MYSQL_USER: root
+      MYSQL_PASSWORD: password
+      MYSQL_DB: crypto_pipeline
+      MYSQL_DATABASE_URL: mysql://root:password@mysql:3306/crypto_pipeline
+      MONGO_URI: mongodb://mongo:27017/
+      MONGO_DB: crypto_pipeline
+      MONGODB_DATABASE_URL: mongodb://mongo:27017/crypto_pipeline?directConnection=true
+    command: ["bash", "database/seed_and_query.sh"]
+
+  api:
+    build: .
+    depends_on:
+      mysql:
+        condition: service_healthy
+      mongo:
+        condition: service_healthy
+      seed:
+        condition: service_completed_successfully
+    ports:
+      - "8000:8000"
+    volumes:
+      - .:/app
+    working_dir: /app
+    environment:
+      MYSQL_HOST: mysql
+      MYSQL_PORT: "3306"
+      MYSQL_USER: root
+      MYSQL_PASSWORD: password
+      MYSQL_DB: crypto_pipeline
+      MYSQL_DATABASE_URL: mysql://root:password@mysql:3306/crypto_pipeline
+      MONGO_URI: mongodb://mongo:27017/
+      MONGO_DB: crypto_pipeline
+      MONGODB_DATABASE_URL: mongodb://mongo:27017/crypto_pipeline?directConnection=true
+    command:
+      - bash
+      - -c
+      - python -m prisma generate --schema database/sql/prisma/schema.prisma && python -m prisma generate --schema database/mongo/prisma/schema.prisma && uvicorn src.main:app --host 0.0.0.0 --port 8000
+
+volumes:
+  mysql_data:
+  mongo_data:

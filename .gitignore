@@ -1,1 +1,5 @@
 project.md
+generated/
+.env
+!.env.example
+__pycache__

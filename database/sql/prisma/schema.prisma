@@ -1,0 +1,70 @@
+generator client {
+  provider                    = "prisma-client-py"
+  output                      = "../../../generated/mysql_client"
+  recursive_type_depth        = "5"
+  interface                   = "asyncio"
+  enable_experimental_decimal = "true"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("MYSQL_DATABASE_URL")
+}
+
+model symbols {
+  symbol_id   Int           @id @default(autoincrement())
+  symbol_code String        @unique(map: "uq_symbol_code") @db.VarChar(10)
+  base_asset  String        @db.VarChar(10)
+  quote_asset String        @default("USD") @db.VarChar(10)
+  is_active   Boolean       @default(true)
+  created_at  DateTime      @default(now()) @db.Timestamp(0)
+  hourly_bars hourly_bars[]
+  data_gaps   data_gaps[]
+  predictions predictions[]
+}
+
+model hourly_bars {
+  bar_id       BigInt   @id @default(autoincrement())
+  symbol_id    Int
+  bar_time     DateTime @db.DateTime(0)
+  open_price   Decimal  @db.Decimal(18, 4)
+  high_price   Decimal  @db.Decimal(18, 4)
+  low_price    Decimal  @db.Decimal(18, 4)
+  close_price  Decimal  @db.Decimal(18, 4)
+  volume       Decimal  @db.Decimal(24, 8)
+  minute_count Int      @db.UnsignedTinyInt
+  created_at   DateTime @default(now()) @db.Timestamp(0)
+  updated_at   DateTime @default(now()) @updatedAt @db.Timestamp(0)
+  symbols      symbols  @relation(fields: [symbol_id], references: [symbol_id], onDelete: Restrict, onUpdate: Cascade, map: "fk_hourly_bars_symbol")
+
+  @@unique([symbol_id, bar_time], map: "uq_symbol_bar_time")
+  @@index([bar_time], map: "idx_bar_time")
+}
+
+model data_gaps {
+  gap_id         Int      @id @default(autoincrement())
+  symbol_id      Int
+  gap_start      DateTime @db.DateTime(0)
+  gap_end        DateTime @db.DateTime(0)
+  duration_hours Int
+  notes          String?  @default("Exchange outage (23-hour gap)") @db.VarChar(255)
+  created_at     DateTime @default(now()) @db.Timestamp(0)
+  symbols        symbols  @relation(fields: [symbol_id], references: [symbol_id], onDelete: Restrict, onUpdate: Cascade, map: "fk_data_gaps_symbol")
+
+  @@unique([symbol_id, gap_start], map: "uq_symbol_gap_start")
+  @@index([gap_start, gap_end], map: "idx_gap_range")
+}
+
+model predictions {
+  prediction_id   BigInt   @id @default(autoincrement())
+  symbol_id       Int
+  target_time     DateTime @db.DateTime(0)
+  predicted_close Decimal  @db.Decimal(18, 4)
+  actual_close    Decimal? @db.Decimal(18, 4)
+  model_version   String   @db.VarChar(50)
+  created_at      DateTime @default(now()) @db.Timestamp(0)
+  symbols         symbols  @relation(fields: [symbol_id], references: [symbol_id], onDelete: Restrict, onUpdate: Cascade, map: "fk_predictions_symbol")
+
+  @@unique([symbol_id, target_time, model_version], map: "uq_symbol_target_model")
+  @@index([target_time], map: "idx_predictions_target_time")
+}
