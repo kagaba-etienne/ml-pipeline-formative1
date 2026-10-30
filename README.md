@@ -195,9 +195,8 @@ PyMySQL returns `DECIMAL` columns as `Decimal`. Convert those values to `float` 
 Start the API first (`docker compose up --build -d`), then from the repository root:
 
 ```bash
-pip install -r requirements-predict.txt
-python src/predict.py                  # MySQL endpoints
-python src/predict.py --source mongo   # MongoDB endpoints
+pipenv run python src/predict.py
+pipenv run python src/predict.py --source mongo
 ```
 
 Options: `--symbol BTCUSD`, `--hours 24` (history to fetch), `--url http://localhost:8000`. Sample output is in `docs/`.

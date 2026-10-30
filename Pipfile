@@ -21,6 +21,8 @@ matplotlib = "*"
 seaborn = "*"
 statsmodels = "*"
 pymysql = "*"
+requests = "*"
+numpy = "*"
 
 [dev-packages]
 ipykernel = "*"
