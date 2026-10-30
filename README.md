@@ -187,3 +187,17 @@ Timestamps are BSON `Date` values in UTC. The symbol code is stored on each docu
 | `minute_count` | `minute_count` | `minute_count` | Minutes present in the hour (1 to 60) |
 
 PyMySQL returns `DECIMAL` columns as `Decimal`. Convert those values to `float` or `str` before JSON encoding. Both databases reject a second bar for the same symbol and hour. Timestamps are UTC. The last bar, `2021-04-20 00:00:00`, is a partial hour (`minute_count` 3 for Bitcoin and 4 for Ether and Litecoin). Other hours in the series are partial as well, so keep `minute_count` on every payload.
+
+## Prediction script (Task 4)
+
+`src/predict.py` fetches the latest hourly bars from the API, applies the same cleaning as the notebook (hourly index, numeric types, gaps of up to 2 hours filled with the previous close), loads `model/persistence_model.pkl` and `model/feature_order.pkl`, and prints the next-hour close forecast.
+
+Start the API first (`docker compose up --build -d`), then from the repository root:
+
+```bash
+pip install -r requirements-predict.txt
+python src/predict.py                  # MySQL endpoints
+python src/predict.py --source mongo   # MongoDB endpoints
+```
+
+Options: `--symbol BTCUSD`, `--hours 24` (history to fetch), `--url http://localhost:8000`. Sample output is in `docs/`.

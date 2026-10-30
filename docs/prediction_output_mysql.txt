@@ -1,0 +1,5 @@
+[1] Fetched 25 bars from mysql; latest: 2021-04-20T00:00:00Z
+[2] Preprocessed to 25 hourly rows (0 hours still missing)
+[3] Loaded model PersistenceRegressor with features ['close']
+[4] Forecast for BTCUSD at 2021-04-20 01:00:00+00:00 UTC: $55,541.69  (current close $55,541.69)
+    Note: the latest bar is a partial hour (3 minutes of trades).
